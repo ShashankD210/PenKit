@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex-between mb-2">
+  <h2 style="color:var(--accent);">📊 Scan Reports</h2>
+  <a href="/" class="btn btn-secondary">← Back</a>
+</div>
+
+<div class="card">
+  <h3>Recent Scans</h3>
+  <p class="text-dim mb-2">Reports are auto-generated after every scan execution. Stored in <code>~/.penkit_reports/</code></p>
+  <div style="overflow-x:auto;">
+    <table>
+      <thead><tr><th>ID</th><th>Tool</th><th>Status</th><th>Timestamp</th><th>Command Preview</th><th>Actions</th></tr></thead>
+      <tbody id="reports-body">
+        {% if reports %}
+          {% set tool_colors = {"ffuf": "#00bcd4", "sqlmap": "#f85149", "dalfox": "#d2991d", "httpx": "#3fb950", "wfuzz": "#bc4cff"} %}
+          {% for r in reports %}
+          <tr>
+            <td class="mono">{{ r.id }}</td>
+            <td style="color:{{ tool_colors.get(r.tool, 'var(--text-primary)') }};">{{ r.tool|upper }}</td>
+            <td><span class="status-{{ 'found' if r.status == 'success' else 'missing' }}">{{ r.status|upper }}</span></td>
+            <td class="text-dim">{{ r.timestamp }}</td>
+            <td class="mono" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{ r.cmd_preview }}</td>
+            <td>
+              <a href="/report/{{ r.id }}" class="btn btn-primary" style="padding:4px 10px;font-size:0.75em;">View</a>
+              <a href="/report/{{ r.id }}/json" class="btn btn-secondary" style="padding:4px 10px;font-size:0.75em;">JSON</a>
+              <a href="/report/{{ r.id }}/html" class="btn btn-secondary" style="padding:4px 10px;font-size:0.75em;">HTML</a>
+            </td>
+          </tr>
+          {% endfor %}
+        {% else %}
+          <tr><td colspan="6" style="text-align:center;color:var(--text-dim);">No reports yet. Run a scan to generate your first report.</td></tr>
+        {% endif %}
+      </tbody>
+    </table>
+  </div>
+  <div class="btn-group mt-2">
+    <button class="btn btn-danger" style="padding:4px 10px;font-size:0.75em;" onclick="deleteAllReports()">Clear All Reports</button>
+    <button class="btn btn-secondary" onclick="location.reload()">🔄 Refresh</button>
+  </div>
+</div>
+
+<script>
+async function deleteAllReports() {
+  if (!confirm('Delete all reports? This cannot be undone.')) return;
+  const r = await fetch('/api/reports', {method: 'DELETE'});
+  if (r.ok) { showToast('Reports cleared'); location.reload(); }
+}
+
+document.addEventListener('DOMContentLoaded', () => {});
+</script>
+{% endblock %}

@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex-between mb-2">
+  <h2 style="color:var(--accent);">🔑 API Key Manager</h2>
+  <a href="/" class="btn btn-secondary">← Back</a>
+</div>
+
+<div class="card">
+  <h3>Key Status (10 Services)</h3>
+  <p class="text-dim mb-2">Keys resolved via env var → config file → interactive prompt. Config: <code>~/.penkit_config.json</code> (chmod 600)</p>
+  <div style="overflow-x:auto;">
+    <table id="keys-table">
+      <thead><tr><th>Service</th><th>Env Variable</th><th>Source</th><th>Masked Value</th><th>Actions</th></tr></thead>
+      <tbody id="keys-body"><tr><td colspan="5" style="text-align:center;">Loading…</td></tr></tbody>
+    </table>
+  </div>
+  <div class="btn-group mt-2">
+    <button class="btn btn-primary" onclick="saveKeys()">💾 Save All Changes</button>
+    <button class="btn btn-secondary" onclick="exportEnv()">📤 Export .env snippet</button>
+    <a href="/" class="btn btn-secondary">← Back to Dashboard</a>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Bulk Add / Update Keys</h3>
+  <p class="text-dim">Paste keys below to bulk-update. Only non-empty values are saved.</p>
+  <div id="bulk-keys">
+    {% for svc, label, env_var in [
+      ('shodan','Shodan','SHODAN_API_KEY'),
+      ('virustotal','VirusTotal','VT_API_KEY'),
+      ('securitytrails','SecurityTrails','SECURITYTRAILS_API_KEY'),
+      ('censys','Censys ID','CENSYS_API_ID'),
+      ('censys_secret','Censys Secret','CENSYS_API_SECRET'),
+      ('hunter','Hunter.io','HUNTER_API_KEY'),
+      ('haveibeenpwned','HaveIBeenPwned','HIBP_API_KEY'),
+      ('whoisxml','WhoisXML','WHOISXML_API_KEY'),
+      ('binaryedge','BinaryEdge','BINARYEDGE_API_KEY'),
+      ('fullhunt','FullHunt','FULLHUNT_API_KEY'),
+    ] %}
+    <div class="form-row">
+      <div class="form-group">
+        <label>{{label}} <span class="text-dim">({{env_var}})</span></label>
+        <input type="text" id="key-{{svc}}" placeholder="paste key here or leave blank to keep existing">
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-success" onclick="saveKeys()">💾 Save Keys</button>
+    <button class="btn btn-secondary" onclick="location.reload()">🔄 Refresh Status</button>
+  </div>
+</div>
+
+<script>
+const keysCache = {};
+function renderKeysTable(keys) {
+  keysCache.__keys = keys;
+  const tb = document.getElementById('keys-body');
+  tb.innerHTML = '';
+  keys.forEach(k=>{
+    const srcColor = k.source==='env' ? 'var(--accent)' : k.source==='config' ? 'var(--green)' : 'var(--red)';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td style="color:var(--text-primary);font-weight:500;">${k.label}</td>
+      <td class="text-dim" style="font-size:0.8em;">${k.env}</td>
+      <td><span style="color:${srcColor};font-weight:600;">${k.source.toUpperCase()}</span></td>
+      <td class="mono">${k.masked || '<span class="text-dim">not set</span>'}</td>
+      <td>
+        <button class="btn btn-danger" style="padding:3px 8px;font-size:0.72em;" onclick="deleteKey('${k.service}')">Delete</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function loadKeys() {
+  const r = await fetch('/api/keys/status');
+  const d = await r.json();
+  if (d.keys) renderKeysTable(d.keys);
+}
+
+async function saveKeys() {
+  const keyEls = document.querySelectorAll('[id^="key-"]');
+  const keys = {};
+  keyEls.forEach(el=>{
+    const svc = el.id.replace('key-','');
+    if (el.value.trim()) keys[svc] = el.value.trim();
+  });
+  const r = await fetch('/api/keys/save', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({keys})});
+  if (r.ok) { showToast('Keys saved successfully'); loadKeys(); }
+  else showToast('Error saving keys', 'error');
+}
+
+loadKeys();
+</script>
+{% endblock %}

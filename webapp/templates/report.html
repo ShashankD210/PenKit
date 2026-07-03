@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex-between mb-2">
+  <h2 style="color:var(--accent);">📄 Scan Report</h2>
+  <div>
+    <a href="/report/{{ report.id }}/json" class="btn btn-secondary" style="font-size:0.8em;">📥 Download JSON</a>
+    <a href="/report/{{ report.id }}/html" class="btn btn-secondary" style="font-size:0.8em;">📥 Download HTML</a>
+    <a href="/reports" class="btn btn-secondary">← Back to Reports</a>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Report Details</h3>
+  <div class="meta-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;">
+    <div class="meta-item" style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;">
+      <label style="display:block;font-size:0.75em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;">Tool</label>
+      <value style="font-size:0.95em;color:var(--text-primary);">{{ report.tool|upper }}</value>
+    </div>
+    <div class="meta-item" style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;">
+      <label style="display:block;font-size:0.75em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;">Status</label>
+      <value style="font-size:0.95em;color:var(--text-primary);">
+        <span class="status-{{ 'found' if report.status == 'success' else 'missing' }}" style="display:inline-block;padding:4px 10px;border-radius:12px;font-size:0.85em;font-weight:600;">
+          {{ report.status|upper }}
+        </span>
+      </value>
+    </div>
+    <div class="meta-item" style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;">
+      <label style="display:block;font-size:0.75em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;">Timestamp</label>
+      <value style="font-size:0.95em;color:var(--text-primary);">{{ report.timestamp }}</value>
+    </div>
+    <div class="meta-item" style="background:var(--bg-primary);border:1px solid var(--border);border-radius:6px;padding:12px;">
+      <label style="display:block;font-size:0.75em;color:var(--text-dim);text-transform:uppercase;letter-spacing:0.5px;">Report ID</label>
+      <value style="font-size:0.95em;color:var(--text-primary);font-family:'Courier New',monospace;">{{ report.id }}</value>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>Command Executed</h3>
+  <pre style="background:#000;border:1px solid var(--border);border-radius:6px;padding:14px;overflow-x:auto;font-size:0.85em;line-height:1.5;white-space:pre-wrap;word-break:break-all;color:var(--accent);">{{ report.cmd }}</pre>
+</div>
+
+<div class="card">
+  <h3>Output</h3>
+  <pre style="background:#000;border:1px solid var(--border);border-radius:6px;padding:14px;overflow-x:auto;font-size:0.85em;line-height:1.5;white-space:pre-wrap;word-break:break-all;color:var(--text-secondary);max-height:500px;overflow-y:auto;">{{ report.output }}</pre>
+</div>
+
+{% if report.extra %}
+<div class="card">
+  <h3>Extra Metadata</h3>
+  <pre style="background:#000;border:1px solid var(--border);border-radius:6px;padding:14px;overflow-x:auto;font-size:0.85em;line-height:1.5;white-space:pre-wrap;word-break:break-all;">{{ report.extra|tojson(indent=2) }}</pre>
+</div>
+{% endif %}
+{% endblock %}

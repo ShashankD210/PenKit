@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="mb-2" style="display:flex;justify-content:space-between;align-items:center;">
+  <h2 style="color:var(--accent);">Dashboard</h2>
+  <span class="text-dim" style="font-size:0.82em;" id="last-check">Loading…</span>
+</div>
+
+<!-- Tools Grid -->
+<div class="card">
+  <h3>Pentest Tools</h3>
+  <div class="tools-grid">
+    {% for t in tools %}
+    <div class="tool-card" onclick="location.href='/builder/{{t.tool}}'">
+      <div class="tool-icon">{{ '🔍' if t.tool=='ffuf' else '💉' if t.tool=='sqlmap' else '🕷️' if t.tool=='dalfox' else '🌐' if t.tool=='httpx' else '⚡' }}</div>
+      <h4 style="color:{{t.color}};">{{t.tool|upper}}</h4>
+      <p>{{t.description}}</p>
+      <div class="status-pill" id="status-{{t.tool}}"><span class="text-dim">Checking…</span></div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="form-row">
+  <!-- Session History -->
+  <div class="card">
+    <div class="flex-between">
+      <h3>📚 Session History</h3>
+      <button class="btn btn-danger" style="padding:4px 10px;font-size:0.75em;" onclick="deleteHistory()">Clear</button>
+    </div>
+    <div style="overflow-x:auto;">
+      <table>
+        <thead><tr><th>Tool</th><th>Time</th><th>Command</th><th>Action</th></tr></thead>
+        <tbody id="history-body">
+          <tr><td colspan="4" style="text-align:center;color:var(--text-dim);">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Quick Launch -->
+  <div class="card">
+    <h3>⚡ Quick Launch</h3>
+    {% for t in tools %}
+    <div style="margin-bottom:6px;">
+      <a href="/builder/{{t.tool}}" class="btn {{ 'btn-primary' if t.found else 'btn-secondary' }}" style="width:100%;justify-content:center;">
+        {{ '💉' if t.tool=='sqlmap' else '🕷️' if t.tool=='dalfox' else '🌐' if t.tool=='httpx' else '⚡' if t.tool=='wfuzz' else '🔍' }}
+        &nbsp;{{t.tool|upper}} Builder
+      </a>
+    </div>
+    {% endfor %}
+    <div style="margin-top:12px;">
+      <a href="/recon" class="btn btn-secondary" style="width:100%;justify-content:center;">🛰️ Recon Module</a>
+    </div>
+  </div>
+</div>
+
+<!-- Features -->
+<div class="card">
+  <h3>What PenKit Does</h3>
+  <div class="feature-grid">
+    <div class="feature-card"><h4>⚡ Command Builder</h4><p>Interactive forms for ffuf, sqlmap, dalfox, httpx, wfuzz — no flag memorization needed.</p></div>
+    <div class="feature-card"><h4>📋 Clipboard Copy</h4><p>One-click copy for generated commands. Paste directly into terminal.</p></div>
+    <div class="feature-card"><h4>🛡️ Dry-Run Mode</h4><p>Preview commands before execution. Review full syntax before running.</p></div>
+    <div class="feature-card"><h4>📚 Session History</h4><p>Persistent history of your last 50 commands. Browse, copy, and re-run past queries.</p></div>
+    <div class="feature-card"><h4>🛰️ Recon Module</h4><p>14 OSINT integrations: Shodan, VirusTotal, SecurityTrails, Censys, Hunter.io, HIBP, WhoisXML, BinaryEdge, FullHunt.</p></div>
+    <div class="feature-card"><h4>🔑 Key Manager</h4><p>Secure API key storage with bulk setup, delete, env-export, and 0600 file permissions.</p></div>
+    <div class="feature-card"><h4>🎨 Rich Terminal UI</h4><p>Beautiful tables, syntax highlighting, panels. Fallback console if rich is unavailable.</p></div>
+    <div class="feature-card"><h4>📦 Standalone Binary</h4><p>12MB Linux ELF binary — no Python needed. Runs anywhere x86_64 Linux.</p></div>
+  </div>
+</div>
+
+<script>loadHistory();</script>
+{% endblock %}

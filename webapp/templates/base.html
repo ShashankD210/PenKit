@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block title %}PenKit{% endblock %} — Pentest Command Builder</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.18/codemirror.min.css">
+<style>
+  :root {
+    --bg-primary: #0d1117;
+    --bg-secondary: #161b22;
+    --bg-tertiary: #1c2129;
+    --border: #30363d;
+    --text-primary: #f0f6fc;
+    --text-secondary: #c9d1d9;
+    --text-dim: #8b949e;
+    --accent: #58a6ff;
+    --green: #3fb950;
+    --red: #f85149;
+    --yellow: #d2991d;
+    --cyan: #00bcd4;
+    --purple: #bc4cff;
+    --orange: #f0883e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg-primary); color: var(--text-secondary); font-family: 'Segoe UI', system-ui, sans-serif; line-height: 1.6; min-height: 100vh; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Header */
+  .header {
+    background: linear-gradient(135deg, #0d1117 0%, #161b22 50%, #0d1117 100%);
+    border-bottom: 2px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; }
+  .logo h1 { font-size: 1.4em; font-weight: 700; letter-spacing: 1px; }
+  .logo .pen { color: var(--accent); }
+  .logo .kit { color: var(--green); }
+  .logo .badge { font-size: 0.65em; background: var(--border); color: var(--text-dim); padding: 3px 8px; border-radius: 10px; letter-spacing: 0.5px; }
+
+  .nav { display: flex; gap: 4px; }
+  .nav a {
+    color: var(--text-secondary);
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 0.85em;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .nav a:hover { background: var(--bg-tertiary); color: var(--text-primary); text-decoration: none; }
+  .nav a.active { background: var(--accent); color: #fff; }
+
+  .status-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    display: inline-block; margin-right: 4px;
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+  }
+
+  /* Layout */
+  .container { max-width: 1400px; margin: 0 auto; padding: 24px; }
+
+  /* Cards */
+  .card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .card h3 {
+    font-size: 1em;
+    color: var(--accent);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+  }
+
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 0.88em; }
+  thead { background: var(--bg-tertiary); }
+  th {
+    text-align: left;
+    padding: 10px 14px;
+    color: var(--text-dim);
+    font-weight: 600;
+    font-size: 0.78em;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border);
+  }
+  td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #21262d;
+    font-family: 'Courier New', monospace;
+  }
+  tr:hover td { background: rgba(88, 166, 255, 0.03); }
+
+  /* Forms */
+  .form-group { margin-bottom: 14px; }
+  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 768px) { .form-row { grid-template-columns: 1fr; } }
+  label { display: block; font-size: 0.82em; color: var(--text-dim); margin-bottom: 5px; font-weight: 500; }
+  input, select, textarea {
+    width: 100%;
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-family: inherit;
+    font-size: 0.9em;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 2px rgba(88,166,255,0.15); }
+  textarea { font-family: 'Courier New', monospace; resize: vertical; min-height: 36px; }
+  .checkbox-group { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+  input[type="checkbox"] { width: auto; }
+
+  /* Buttons */
+  .btn {
+    padding: 8px 18px;
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 500;
+    font-size: 0.85em;
+    transition: all 0.2s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { background: var(--bg-tertiary); text-decoration: none; }
+  .btn-primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  .btn-primary:hover { background: #4090ea; }
+  .btn-success { background: var(--green); color: #fff; border-color: var(--green); }
+  .btn-success:hover { background: #2ea043; }
+  .btn-danger { background: var(--red); color: #fff; border-color: var(--red); }
+  .btn-danger:hover { background: #da3633; }
+  .btn-secondary { background: var(--bg-tertiary); }
+  .btn-yellow { background: var(--yellow); color: #000; border-color: var(--yellow); }
+  .btn-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+
+  /* Status badges */
+  .status-found { background: rgba(63,185,80,0.12); color: var(--green); padding: 3px 10px; border-radius: 12px; font-size: 0.82em; font-weight: 600; }
+  .status-missing { background: rgba(248,81,73,0.12); color: var(--red); padding: 3px 10px; border-radius: 12px; font-size: 0.82em; font-weight: 600; }
+
+  /* Code/output */
+  .output-box {
+    background: #000;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.85em;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-all;
+    min-height: 100px;
+    max-height: 500px;
+    overflow-y: auto;
+    margin-top: 12px;
+  }
+  .output-box .cmd-line { color: var(--cyan); }
+  .output-box .success { color: var(--green); }
+  .output-box .error { color: var(--red); }
+  .output-box .warn { color: var(--yellow); }
+
+  .cmd-preview {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 12px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 0.82em;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    margin-top: 12px;
+  }
+
+  /* Grid */
+  .tools-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .tool-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: center;
+  }
+  .tool-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .tool-card .tool-icon { font-size: 2em; margin-bottom: 6px; }
+  .tool-card h4 { color: var(--text-primary); font-size: 0.95em; margin-bottom: 4px; }
+  .tool-card p { font-size: 0.75em; color: var(--text-dim); line-height: 1.4; }
+  .tool-card .status-pill {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 2px 8px;
+    border-radius: 8px;
+    font-size: 0.7em;
+    font-weight: 600;
+  }
+
+  /* Feature grid */
+  .feature-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 12px;
+  }
+  .feature-card {
+    background: var(--bg-primary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 14px;
+  }
+  .feature-card h4 { font-size: 0.85em; color: var(--text-primary); margin-bottom: 4px; }
+  .feature-card p { font-size: 0.78em; color: var(--text-dim); line-height: 1.4; }
+
+  /* Modal */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+  .modal {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 24px;
+    max-width: 700px;
+    width: 90%;
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modal h3 { font-size: 1.1em; color: var(--accent); margin-bottom: 16px; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 18px;
+    font-size: 0.85em;
+    z-index: 300;
+    display: none;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+  }
+  .toast.show { display: block; }
+  .toast.success { border-left: 3px solid var(--green); }
+  .toast.error { border-left: 3px solid var(--red); }
+
+  /* Helpers */
+  .text-green { color: var(--green); }
+  .text-red { color: var(--red); }
+  .text-yellow { color: var(--yellow); }
+  .text-blue { color: var(--accent); }
+  .text-dim { color: var(--text-dim); }
+  .mono { font-family: 'Courier New', monospace; }
+  .mt-1 { margin-top: 8px; }
+  .mt-2 { margin-top: 16px; }
+  .mt-3 { margin-top: 24px; }
+  .mb-1 { margin-bottom: 8px; }
+  .mb-2 { margin-bottom: 16px; }
+  .flex { display: flex; gap: 8px; }
+  .flex-between { display: flex; justify-content: space-between; align-items: center; }
+
+  .footer {
+    text-align: center;
+    padding: 24px;
+    color: var(--text-dim);
+    font-size: 0.75em;
+    border-top: 1px solid var(--border);
+    margin-top: 40px;
+    font-family: 'Courier New', monospace;
+  }
+
+  @media (max-width: 768px) {
+    .header { flex-direction: column; gap: 10px; }
+    .nav { flex-wrap: wrap; justify-content: center; }
+    .form-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<div class="header">
+  <div class="logo">
+    <h1><span class="pen">Pen</span><span class="kit">Kit</span></h1>
+    <span class="badge">WEB UI v1.0</span>
+  </div>
+  <div class="nav">
+    <a href="/" class="{% if request.endpoint == 'index' %}active{% endif %}">🏠 Dashboard</a>
+    <a href="/vuln" class="{% if request.endpoint in ('vuln_page',) %}active{% endif %}">🛡️ Vuln Scan</a>
+    <a href="/reports" class="{% if request.endpoint in ('reports_page', 'report_view') %}active{% endif %}">📊 Reports</a>
+    <a href="/builder/ffuf" class="{% if request.endpoint in ('builder',) %}active{% endif %}">⚡ Builders</a>
+    <a href="/recon" class="{% if request.endpoint == 'recon' %}active{% endif %}">🛰️ Recon</a>
+    <a href="/keys" class="{% if request.endpoint == 'keys' %}active{% endif %}">🔑 Keys</a>
+    <a href="#" onclick="fetch('/status').then(r=>r.json()).then(d=>{document.querySelector('.nav-live').textContent='✅ OK';document.querySelector('.nav-live').style.color='var(--green)'})"><span class="nav-live text-dim" style="font-size:0.8em;">🟢 Live</span></a>
+  </div>
+</div>
+
+<div class="container">
+  {% block content %}{% endblock %}
+</div>
+
+<div class="footer">
+  PenKit v1.0.0 &nbsp;|&nbsp; Unified Pentest Command Builder &nbsp;|&nbsp; Web UI
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="modal-overlay" id="modal">
+  <div class="modal" id="modal-content"></div>
+</div>
+
+<script>
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = 'toast show ' + type;
+  setTimeout(() => t.className = 'toast', 3000);
+}
+
+function copyToClipboard(text) {
+  navigator.clipboard.writeText(text).then(() => showToast('Copied to clipboard'));
+}
+
+function showModal(title, body) {
+  document.getElementById('modal-content').innerHTML = `<h3>${title}</h3>${body}<div class="btn-group" style="margin-top:20px;"><button class="btn btn-secondary" onclick="document.getElementById('modal').classList.remove('active')">Close</button></div>`;
+  document.getElementById('modal').classList.add('active');
+}
+
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) this.classList.remove('active');
+});
+
+function loadStatus() {
+  fetch('/status').then(r=>r.json()).then(d=>{
+    d.tools.forEach(t=>{
+      const el = document.getElementById('status-'+t.tool);
+      if (el) {
+        if (t.found) { el.innerHTML = '<span class="status-found">✅ FOUND</span>'; }
+        else { el.innerHTML = '<span class="status-missing">❌ MISSING</span>'; }
+      }
+    });
+  });
+}
+function loadHistory() {
+  fetch('/history').then(r=>r.json()).then(d=>{
+    const tb = document.getElementById('history-body');
+    if (!tb) return;
+    tb.innerHTML = '';
+    if (!d.history.length) { tb.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-dim);">No history yet</td></tr>'; return; }
+    d.history.slice().reverse().forEach(s=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${s.tool}</td><td><span class="text-dim">${s.timestamp}</span></td><td class="mono" style="max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.cmd.replace(/\n/g,' ').substring(0,100)}</td><td><button class="btn btn-secondary" style="padding:3px 8px;font-size:0.75em;" onclick="copyToClipboard(\`${s.cmd.replace(/`/g,'\\`')}\`)">Copy</button></td>`;
+      tb.appendChild(tr);
+    });
+  });
+}
+async function deleteHistory() {
+  if (!confirm('Clear all session history?')) return;
+  const r = await fetch('/clear-history', {method:'POST', headers:{'Content-Type':'application/json'}, body:'{}'});
+  if (r.ok) { showToast('History cleared'); loadHistory(); }
+}
+
+async function deleteKey(service) {
+  if (!confirm(`Delete key for ${service}?`)) return;
+  const r = await fetch('/api/keys/delete', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({services:[service]})});
+  if (r.ok) { showToast('Key deleted'); location.reload(); }
+}
+
+function exportEnv() {
+  fetch('/api/keys/export').then(r=>r.json()).then(d=>{
+    if (d.export) {
+      copyToClipboard(d.export);
+      showModal('Env Export', '<pre style=\"background:#000;padding:12px;border-radius:4px;font-size:0.82em;max-height:400px;overflow:auto;\">' + d.export.replace(/</g,'&lt;') + '</pre>');
+    }
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => { if (typeof loadStatus === 'function') loadStatus(); if (typeof loadHistory === 'function') loadHistory(); });
+</script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

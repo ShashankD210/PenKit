@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex-between mb-2">
+  <h2 style="color:var(--accent);">🛰️ Reconnaissance Module</h2>
+  <a href="/" class="btn btn-secondary">← Back</a>
+</div>
+
+<div class="card">
+  <h3>14 Recon Operations</h3>
+  <p class="text-dim mb-2">Select a module, enter the target, and run. API keys are resolved automatically.</p>
+  <div class="tools-grid" style="grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));">
+    {% set modules = [
+      ('shodan_host','🔍 Shodan Host','Lookup by IP'),
+      ('shodan_search','🔎 Shodan Search','Full-text query'),
+      ('vt_url','🦠 VT URL','URL scan check'),
+      ('vt_ip','🌐 VT IP','IP reputation'),
+      ('vt_hash','# VT Hash','File hash lookup'),
+      ('st_sub','📋 SecTrails Sub','Subdomain enum'),
+      ('st_dns','📡 SecTrails DNS','DNS records'),
+      ('censys','🔎 Censys IP','Host lookup'),
+      ('hunter_dom','📧 Hunter Domain','Email discovery'),
+      ('hunter_ver','✓ Hunter Verify','Email verify'),
+      ('hibp','💔 HIBP','Breach check'),
+      ('whoisxml','🏛️ WhoisXML','WHOIS lookup'),
+      ('binaryedge','⚡ BinaryEdge','IP scan'),
+      ('fullhunt','🎯 FullHunt','Attack surface'),
+    ] %}
+    {% for svc, label, desc in modules %}
+    <div class="tool-card" onclick="openRecon('{{svc}}','{{label}}','{{desc}}')">
+      <div class="tool-icon">{{label.split(' ')[0]}}</div>
+      <h4>{{label.split(' ',1)[1] if ' ' in label else label}}</h4>
+      <p>{{desc}}</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card" id="recon-panel" style="display:none;">
+  <h3 id="recon-title">Run Recon</h3>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Target / Input</label>
+      <input type="text" id="recon-target" placeholder="Enter target (IP, domain, URL, email, hash)">
+    </div>
+    <div class="form-group">
+      <label>Limit / Extra</label>
+      <input type="text" id="recon-limit" placeholder="Max results or extra param" value="10">
+    </div>
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-primary" onclick="runRecon()">▶ Run Query</button>
+    <button class="btn btn-secondary" onclick="document.getElementById('recon-panel').style.display='none'">Cancel</button>
+  </div>
+  <div class="output-box" id="recon-output">Ready. Select a module above.</div>
+</div>
+
+<script>
+let currentRecon = '';
+function openRecon(svc, label, desc) {
+  currentRecon = svc;
+  document.getElementById('recon-title').textContent = label + ' — ' + desc;
+  const inp = document.getElementById('recon-target');
+  inp.placeholder = svc.includes('ip') ? 'e.g. 1.1.1.1' : svc.includes('domain') || svc.includes('hunter_dom') ? 'e.g. example.com' : svc.includes('url') || svc.includes('vt_url') ? 'e.g. https://example.com' : svc.includes('email') || svc.includes('hibp') || svc.includes('hunter_ver') ? 'e.g. user@example.com' : svc.includes('hash') ? 'e.g. d41d8cd98f00b204e9800998ecf8427e' : 'Enter target';
+  document.getElementById('recon-panel').style.display = 'block';
+  document.getElementById('recon-output').textContent = 'Ready to query: ' + label;
+  document.getElementById('recon-panel').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+async function runRecon() {
+  const target = document.getElementById('recon-target').value.trim();
+  const limit = document.getElementById('recon-limit').value.trim() || '10';
+  if (!target) { showToast('Enter a target value','error'); return; }
+  const box = document.getElementById('recon-output');
+  box.innerHTML = '<span class="warn">⏳ Querying…</span>';
+  const body = {};
+  if (currentRecon.includes('ip')) body.ip = target;
+  else if (currentRecon.includes('domain') || currentRecon.includes('st_sub') || currentRecon.includes('fullhunt')) body.domain = target;
+  else if (currentRecon.includes('vt_url') || currentRecon.includes('censys')) body.url = target;
+  else if (currentRecon.includes('vt_ip') || currentRecon.includes('binaryedge')) body.ip = target;
+  else if (currentRecon.includes('vt_hash')) body.hash = target;
+  else if (currentRecon.includes('hunter_dom')) body.domain = target;
+  else if (currentRecon.includes('hunter_ver') || currentRecon.includes('hibp')) body.email = target;
+  else if (currentRecon.includes('st_dns')) body.domain = target;
+  else if (currentRecon.includes('whoisxml')) body.domain = target;
+  else body.query = target;
+  if (currentRecon === 'shodan_search') body.limit = parseInt(limit);
+  if (currentRecon === 'fullhunt') body.limit = parseInt(limit);
+
+  try {
+    const r = await fetch('/api/recon/' + currentRecon, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await r.json();
+    if (d.ok) { box.innerHTML = '<span class="success">✔ Query completed. Results displayed in terminal when run from CLI, or check API response.</span><br><span class="text-dim">For full output, run locally with python3 penkit_recon.py</span>'; showToast('Query executed'); }
+    else box.innerHTML = '<span class="error">Error: ' + JSON.stringify(d) + '</span>';
+  } catch(e) { box.innerHTML = '<span class="error">Error: ' + e + '</span>'; }
+}
+</script>
+{% endblock %}

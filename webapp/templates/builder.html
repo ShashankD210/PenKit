@@ -1,0 +1,228 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex-between mb-2">
+  <h2 style="color:var(--accent);">⚡ Command Builder — {{tool|upper}}</h2>
+  <a href="/" class="btn btn-secondary">← Back</a>
+</div>
+
+<div class="form-row">
+  <div class="card">
+    <h3>Configuration</h3>
+    <form id="builder-form" onsubmit="return false;">
+      <div id="tool-fields"></div>
+    </form>
+  </div>
+
+  <div>
+    <div class="card" style="background:var(--bg-primary);border:1px solid var(--border);border-left:3px solid var(--yellow);">
+      <h3 style="color:var(--yellow);">🎭 Anti-Detection</h3>
+      <div class="checkbox-group">
+        <input type="checkbox" id="f-random-agent" checked>
+        <label for="f-random-agent">Random User-Agent header (spoofs browser identity per request)</label>
+      </div>
+      <div class="checkbox-group mt-1">
+        <input type="checkbox" id="f-random-ip">
+        <label for="f-random-ip">Random source IP hints (where supported by tool)</label>
+      </div>
+      <div style="margin-top:8px;" class="mono text-dim" style="font-size:0.78em;" id="agent-preview">
+        Preview: <span id="current-agent">—</span>
+      </div>
+    </div>
+
+    <div class="btn-group mt-2">
+      <button class="btn btn-primary" onclick="generate()">🔨 Generate Command</button>
+      <button class="btn btn-yellow" onclick="dryRun()">👁️ Dry Run</button>
+      <button class="btn btn-success" onclick="runCommand()">▶ Run</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Generated Command</h3>
+    <div class="cmd-preview mono" id="cmd-output" style="min-height:80px;color:var(--text-dim);">
+      Click "Generate Command" to build your command.
+    </div>
+    <div class="btn-group">
+      <button class="btn btn-secondary" onclick="copyCmd()">📋 Copy</button>
+      <button class="btn btn-success" onclick="runCurrent()">▶ Run</button>
+      <button class="btn btn-yellow" onclick="dryCurrent()">👁️ Dry Run</button>
+    </div>
+
+    <h3 class="mt-2">Output</h3>
+    <div class="output-box" id="cmd-output-box">No output yet.</div>
+  </div>
+</div>
+
+<script>
+let currentCmd = '';
+
+const toolFields = {
+  ffuf: [
+    {name:'url', label:'Target URL (use FUZZ keyword)', type:'text', default:'https://target.com/FUZZ'},
+    {name:'wordlist', label:'Wordlist path', type:'text', default:'/usr/share/wordlists/dirb/common.txt'},
+    {name:'method', label:'HTTP Method', type:'select', default:'GET', options:['GET','POST','PUT','DELETE','PATCH','HEAD']},
+    {name:'threads', label:'Threads', type:'text', default:'40'},
+    {name:'mc', label:'Match HTTP codes (comma-sep)', type:'text', default:'200,301,302,403', placeholder:'200,301 or blank'},
+    {name:'fs', label:'Filter by response size', type:'text', default:'', placeholder:'blank = none'},
+    {name:'ext', label:'File extensions (e.g. php,html)', type:'text', default:'', placeholder:'php,html,asp'},
+    {name:'headers', label:'Extra headers (Name: Value | Name: Value)', type:'text', default:'', placeholder:'User-Agent: Custom | Authorization: Bearer token'},
+    {name:'data', label:'POST data body', type:'text', default:'', placeholder:'param1=FUZZ&param2=test'},
+    {name:'recursion', label:'Enable recursion', type:'checkbox', default:false},
+    {name:'follow', label:'Follow redirects', type:'checkbox', default:false},
+    {name:'silent', label:'Silent mode', type:'checkbox', default:false},
+    {name:'output', label:'Output file (JSON)', type:'text', default:'', placeholder:'blank = none'},
+    {name:'proxy', label:'Proxy (http://127.0.0.1:8080)', type:'text', default:'', placeholder:'blank = none'},
+  ],
+  sqlmap: [
+    {name:'url', label:'Target URL (with param, e.g. ?id=1)', type:'text', default:'https://target.com/page?id=1'},
+    {name:'data', label:'POST data (blank=GET)', type:'text', default:''},
+    {name:'cookie', label:'Cookie header', type:'text', default:'', placeholder:'PHPSESSID=abc123'},
+    {name:'level', label:'Level (1-5)', type:'select', default:'1', options:['1','2','3','4','5']},
+    {name:'risk', label:'Risk (1-3)', type:'select', default:'1', options:['1','2','3']},
+    {name:'dbms', label:'Force DBMS (blank=auto)', type:'text', default:'', placeholder:'MySQL/PostgreSQL/Oracle/SQLite/MSSQL'},
+    {name:'threads', label:'Threads (1-10)', type:'text', default:'1'},
+    {name:'headers', label:'Extra headers (Name: Value)', type:'text', default:'', placeholder:'X-Forwarded-For: 127.0.0.1'},
+    {name:'proxy', label:'Proxy (blank=none)', type:'text', default:'', placeholder:'http://127.0.0.1:8080'},
+    {name:'dbs', label:'Enumerate databases (--dbs)', type:'checkbox', default:false},
+    {name:'tables', label:'Enumerate tables (--tables)', type:'checkbox', default:false},
+    {name:'dump', label:'Dump database (--dump)', type:'checkbox', default:false},
+    {name:'os_sh', label:'Attempt OS shell (--os-shell)', type:'checkbox', default:false},
+    {name:'tor', label:'Use Tor (--tor)', type:'checkbox', default:false},
+    {name:'batch', label:'Batch mode — no prompts (--batch)', type:'checkbox', default:true},
+    {name:'rand_ua', label:'Random user-agent (--random-agent)', type:'checkbox', default:true},
+    {name:'tamper', label:'Tamper scripts (comma-sep)', type:'text', default:'', placeholder:'space2comment,randomcase'},
+  ],
+  dalfox: [
+    {name:'mode', label:'Mode', type:'select', default:'url', options:['url','pipe','file','sxss']},
+    {name:'url', label:'Target URL', type:'text', default:'https://target.com/search?q=test'},
+    {name:'cookie', label:'Cookie', type:'text', default:'', placeholder:'session=abc123'},
+    {name:'header', label:'Custom header (Name: Value)', type:'text', default:''},
+    {name:'data', label:'POST data (blank=GET)', type:'text', default:''},
+    {name:'worker', label:'Worker threads', type:'text', default:'100'},
+    {name:'timeout', label:'Timeout (seconds)', type:'text', default:'10'},
+    {name:'payload', label:'Custom payload file', type:'text', default:'', placeholder:'/path/to/payloads.txt'},
+    {name:'blind', label:'Blind XSS callback URL', type:'text', default:'', placeholder:'https://your-xss-server.com'},
+    {name:'proxy', label:'Proxy (blank=none)', type:'text', default:''},
+    {name:'waf', label:'Enable WAF evasion', type:'checkbox', default:false},
+    {name:'mining', label:'Mine parameters from URL', type:'checkbox', default:false},
+    {name:'follow', label:'Follow redirects', type:'checkbox', default:false},
+    {name:'skip', label:'Skip BAV', type:'checkbox', default:false},
+    {name:'json_out', label:'JSON output', type:'checkbox', default:false},
+    {name:'output', label:'Output file', type:'text', default:'', placeholder:'blank = none'},
+  ],
+  httpx: [
+    {name:'target', label:'Target file or single URL', type:'text', default:'targets.txt'},
+    {name:'ports', label:'Ports to probe (comma-sep)', type:'text', default:'80,443'},
+    {name:'threads', label:'Threads', type:'text', default:'50'},
+    {name:'rate', label:'Rate limit req/s (0=unlimited)', type:'text', default:'0'},
+    {name:'mc', label:'Match status codes', type:'text', default:'', placeholder:'blank = all'},
+    {name:'proxy', label:'Proxy (blank=none)', type:'text', default:''},
+    {name:'sc', label:'Show status code', type:'checkbox', default:true},
+    {name:'title', label:'Show page title', type:'checkbox', default:true},
+    {name:'tech', label:'Technology detection', type:'checkbox', default:false},
+    {name:'ip', label:'Show IP address', type:'checkbox', default:false},
+    {name:'cl', label:'Show content length', type:'checkbox', default:false},
+    {name:'cname', label:'Show CNAME', type:'checkbox', default:false},
+    {name:'tls', label:'TLS info', type:'checkbox', default:false},
+    {name:'follow', label:'Follow redirects', type:'checkbox', default:false},
+    {name:'probe', label:'Show probe status', type:'checkbox', default:false},
+    {name:'silent', label:'Silent mode', type:'checkbox', default:false},
+    {name:'json_out', label:'JSON output lines', type:'checkbox', default:false},
+    {name:'output', label:'Output file', type:'text', default:'', placeholder:'blank = none'},
+  ],
+  wfuzz: [
+    {name:'wl', label:'Wordlist path (-w)', type:'text', default:'/usr/share/wordlists/dirb/common.txt'},
+    {name:'wl2', label:'Second wordlist for FUZ2Z', type:'text', default:'', placeholder:'blank = none'},
+    {name:'url', label:'Target URL (use FUZZ/FUZ2Z)', type:'text', default:'https://target.com/FUZZ'},
+    {name:'method', label:'HTTP Method', type:'select', default:'GET', options:['GET','POST','PUT','DELETE','PATCH','HEAD']},
+    {name:'threads', label:'Threads', type:'text', default:'10'},
+    {name:'hc', label:'Hide HTTP codes', type:'text', default:'404', placeholder:'404,400'},
+    {name:'sc', label:'Show only these codes', type:'text', default:'', placeholder:'blank = all'},
+    {name:'hw', label:'Hide by word count', type:'text', default:'', placeholder:'blank = none'},
+    {name:'hl', label:'Hide by line count', type:'text', default:''},
+    {name:'hh', label:'Hide by char count', type:'text', default:''},
+    {name:'data', label:'POST data', type:'text', default:''},
+    {name:'header', label:'Custom header (Name: Value)', type:'text', default:''},
+    {name:'cookie', label:'Cookie', type:'text', default:'', placeholder:'name=value'},
+    {name:'proxy', label:'Proxy (blank=none)', type:'text', default:''},
+    {name:'verbose', label:'Verbose output', type:'checkbox', default:false},
+    {name:'color', label:'Colorized output', type:'checkbox', default:true},
+    {name:'tor', label:'Route through Tor', type:'checkbox', default:false},
+    {name:'output', label:'Output file', type:'text', default:'', placeholder:'blank = none'},
+  ]
+};
+
+function renderFields() {
+  const container = document.getElementById('tool-fields');
+  const fields = toolFields['{{tool}}'] || [];
+  let html = '';
+  fields.forEach((f, i) => {
+    if (f.type === 'checkbox') {
+      html += `<div class="checkbox-group"><input type="checkbox" id="f-${f.name}" ${f.default ? 'checked' : ''}><label for="f-${f.name}" style="margin:0;">${f.label}</label></div>`;
+    } else if (f.type === 'select') {
+      html += `<div class="form-group"><label>${f.label}</label><select id="f-${f.name}">${f.options.map(o=>'<option value=\"'+o+'\"'+(o===f.default?' selected':'')+'>'+o+'</option>').join('')}</select></div>`;
+    } else if (f.type === 'textarea') {
+      html += `<div class="form-group"><label>${f.label}</label><textarea id="f-${f.name}" rows="3" placeholder="${f.placeholder||''}">${f.default||''}</textarea></div>`;
+    } else {
+      html += `<div class="form-group"><label>${f.label}</label><input type="text" id="f-${f.name}" value="${f.default||''}" placeholder="${f.placeholder||''}"></div>`;
+    }
+  });
+  container.innerHTML = html;
+}
+
+function collectForm() {
+  const data = {};
+  const fields = toolFields['{{tool}}'] || [];
+  fields.forEach(f => {
+    const el = document.getElementById('f-'+f.name);
+    if (!el) return;
+    if (f.type === 'checkbox') data[f.name] = el.checked;
+    else data[f.name] = el.value.trim();
+  });
+  return data;
+}
+
+function toolEndpoint() {
+  return {ffuf:'ffuf',sqlmap:'sqlmap',dalfox:'dalfox',httpx:'httpx',wfuzz:'wfuzz'}['{{tool}}'] || '{{tool}}';
+}
+
+function displayCmd(cmd) {
+  document.getElementById('cmd-output').textContent = cmd || 'No command generated.';
+  document.getElementById('cmd-output').style.color = cmd ? 'var(--text-primary)' : 'var(--text-dim)';
+}
+
+function generate() {
+  const data = collectForm();
+  const payload = { tool: toolEndpoint(), params: data };
+  fetch('/generate', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(payload)})
+    .then(r=>r.json()).then(d=>{
+      if (d.cmd) { currentCmd = d.cmd; displayCmd(d.cmd); showToast('Command generated'); }
+      else showToast('Error generating command', 'error');
+    });
+}
+
+function sendCmd(dry) {
+  if (!currentCmd) { showToast('Generate a command first','error'); return; }
+  const box = document.getElementById('cmd-output-box');
+  box.innerHTML = '<span class="warn">⏳ Executing…</span>';
+  fetch('/run', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({cmd:currentCmd, tool:toolEndpoint(), dry_run:dry})})
+    .then(r=>r.json()).then(d=>{
+      if (d.dry_run) {
+        box.innerHTML = '<span class="cmd-line">[DRY RUN]</span>\n' + (d.output||'').replace(/</g,'&lt;');
+      } else {
+        box.innerHTML = (d.output||'').replace(/</g,'&lt;');
+        if (d.report_id) {
+          box.innerHTML += '<div class="btn-group mt-2"><a href="/report/' + d.report_id + '" class="btn btn-primary" style="font-size:0.8em;">📄 View Report</a><a href="/report/' + d.report_id + '/json" class="btn btn-secondary" style="font-size:0.8em;">📥 JSON</a></div>';
+        }
+      }
+    }).catch(e=>{ box.innerHTML = '<span class="error">Error: '+e+'</span>'; });
+}
+
+function dryRun() { if (currentCmd) sendCmd(true); else generate().then(()=>sendCmd(true)); }
+function runCommand() { if (currentCmd) sendCmd(false); else generate().then(()=>sendCmd(false)); }
+function runCurrent() { if (currentCmd) sendCmd(false); else showToast('Generate a command first','error'); }
+function dryCurrent() { if (currentCmd) sendCmd(true); else showToast('Generate a command first','error'); }
+function copyCmd() { if (currentCmd) copyToClipboard(currentCmd); }
+
+renderFields();
+</script>
+{% endblock %}

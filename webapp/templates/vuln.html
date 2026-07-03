@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="flex-between mb-2">
+  <h2 style="color:var(--accent);">🛡️ Vulnerability & CVE Scanner</h2>
+  <a href="/" class="btn btn-secondary">← Back</a>
+</div>
+
+<div class="card">
+  <h3>Scan Types</h3>
+  <p class="text-dim mb-2">Scan URLs, IPs, and technologies for known CVEs using the NVD database.</p>
+  <div class="tools-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));">
+    {% set scans = [
+      ('url', '🔍 URL Scan', 'Detect technologies and lookup CVEs'),
+      ('ip', '🌐 IP Scan', 'Port scan and CVE lookup for services'),
+      ('keyword', '🔎 Keyword Search', 'Search CVEs by product/technology name'),
+      ('cpe', '📋 CPE Lookup', 'Lookup CVEs by exact CPE string'),
+    ] %}
+    {% for svc, label, desc in scans %}
+    <div class="tool-card" onclick="openVulnScan('{{svc}}','{{label}}','{{desc}}')">
+      <div class="tool-icon">{{label.split(' ')[0]}}</div>
+      <h4>{{label.split(' ',1)[1] if ' ' in label else label}}</h4>
+      <p>{{desc}}</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="card" id="vuln-panel" style="display:none;">
+  <h3 id="vuln-title">Run Vulnerability Scan</h3>
+  <div class="form-row">
+    <div class="form-group">
+      <label id="vuln-input-label">Target</label>
+      <input type="text" id="vuln-input" placeholder="Enter target" value="">
+    </div>
+    <div class="form-group">
+      <label>Limit / Extra</label>
+      <input type="text" id="vuln-limit" placeholder="Max results" value="20">
+    </div>
+  </div>
+  <div class="btn-group">
+    <button class="btn btn-primary" onclick="runVulnScan()">▶ Run Scan</button>
+    <button class="btn btn-secondary" onclick="document.getElementById('vuln-panel').style.display='none'">Cancel</button>
+  </div>
+  <div class="output-box" id="vuln-output">Ready. Select a scan type above.</div>
+</div>
+
+<script>
+let currentVuln = '';
+function openVulnScan(svc, label, desc) {
+  currentVuln = svc;
+  document.getElementById('vuln-title').textContent = label + ' — ' + desc;
+  const inp = document.getElementById('vuln-input');
+  const limit = document.getElementById('vuln-limit');
+  if (svc === 'url') {
+    inp.placeholder = 'e.g. https://target.com';
+    inp.value = 'https://target.com';
+  } else if (svc === 'ip') {
+    inp.placeholder = 'e.g. 192.168.1.1';
+    inp.value = '192.168.1.1';
+  } else if (svc === 'keyword') {
+    inp.placeholder = 'e.g. Apache, Nginx, WordPress';
+    inp.value = 'Apache';
+  } else if (svc === 'cpe') {
+    inp.placeholder = 'e.g. cpe:2.3:a:apache:http_server:2.4.49';
+    inp.value = '';
+  }
+  limit.value = '20';
+  document.getElementById('vuln-panel').style.display = 'block';
+  document.getElementById('vuln-output').textContent = 'Ready to scan: ' + label;
+  document.getElementById('vuln-panel').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+async function runVulnScan() {
+  const target = document.getElementById('vuln-input').value.trim();
+  const limit = document.getElementById('vuln-limit').value.trim() || '20';
+  if (!target && currentVuln !== 'keyword') { showToast('Enter a target value','error'); return; }
+  const box = document.getElementById('vuln-output');
+  box.innerHTML = '<span class="warn">⏳ Scanning…</span>';
+  let url = '';
+  if (currentVuln === 'url') url = '/api/vuln/scan_url';
+  else if (currentVuln === 'ip') url = '/api/vuln/scan_ip';
+  else if (currentVuln === 'keyword') url = '/api/vuln/search_cve';
+  else if (currentVuln === 'cpe') url = '/api/vuln/lookup_cpe';
+  else { showToast('Unknown scan type','error'); return; }
+  const body = {};
+  if (currentVuln === 'url') body.url = target;
+  else if (currentVuln === 'ip') body.ip = target;
+  else if (currentVuln === 'keyword') body.keyword = target;
+  else if (currentVuln === 'cpe') body.cpe = target;
+  body.limit = parseInt(limit);
+  try {
+    const r = await fetch(url, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(body)});
+    const d = await r.json();
+    if (d.vulns && d.vulns.length > 0) {
+      let html = '<table style="width:100%;font-size:0.85em;"><thead><tr><th>CVE ID</th><th>Severity</th><th>Score</th><th>Technology</th><th>Description</th></tr></thead><tbody>';
+      d.vulns.forEach(v => {
+        const sevColor = v.severity === 'CRITICAL' ? 'var(--red)' : v.severity === 'HIGH' ? 'var(--red)' : v.severity === 'MEDIUM' ? 'var(--yellow)' : v.severity === 'LOW' ? 'var(--accent)' : 'var(--text-dim)';
+        html += `<tr><td class="mono">${v.id}</td><td style="color:${sevColor};font-weight:600;">${v.severity}</td><td>${v.score || '—'}</td><td>${v.tech || ''}</td><td>${(v.description || '').substring(0, 80)}</td></tr>`;
+      });
+      html += '</tbody></table>';
+      box.innerHTML = html;
+      showToast(`Found ${d.vulns.length} CVEs`);
+    } else {
+      box.innerHTML = '<span class="success">✔ No CVEs found for this target.</span>';
+      showToast('No CVEs found');
+    }
+  } catch(e) { box.innerHTML = '<span class="error">Error: ' + e + '</span>'; }
+}
+</script>
+{% endblock %}
